@@ -22,7 +22,7 @@ public class MechanicVisitDTO
     public int MechanicId { get; set; }
     
     [Required]
-    [MaxLength(14)]
+    [StringLength(14)]
     public string LicenseNumber { get; set; }
 }
 

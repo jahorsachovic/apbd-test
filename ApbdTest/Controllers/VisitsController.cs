@@ -37,7 +37,7 @@ public class VisitsController : ControllerBase
         {
 
                 if (!ModelState.IsValid)
-                {
+                { 
                         return BadRequest(ModelState);
                 }
 

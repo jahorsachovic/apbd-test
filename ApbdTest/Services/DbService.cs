@@ -12,7 +12,7 @@ public class DbService : IDbService
 
     public DbService(IConfiguration configuration)
     {
-        _connectionString = configuration.GetConnectionString("Default") ?? string.Empty;
+        _connectionString = configuration.GetConnectionString("Default");
     }
 
     public async Task<GetVisitDTO> GetVisitByIdAsync(int visitId)
@@ -87,9 +87,105 @@ public class DbService : IDbService
     public async Task<string> AddNewVisitAsync(AddVisitDTO data)
     {
         await using SqlConnection connection = new SqlConnection(_connectionString);
-        
-        
-        
-        return "Insertion successful";
+        await connection.OpenAsync();
+        //await using SqlCommand command = new SqlCommand();
+
+        //Validate if the Visit with this id already exists
+        await using (SqlCommand command = new SqlCommand())
+        {
+            command.Connection = connection;
+            command.CommandText = @"
+                                    SELECT 1 FROM Visit WHERE visit_id = @VisitId;
+                                    ";
+            command.Parameters.AddWithValue("@VisitId", data.VisitId);
+
+            var result = await command.ExecuteScalarAsync();
+
+            if (result != null)
+            {
+                throw new NotFoundException("Invalid visit Id");
+            }
+        }
+
+        //Validate if the Client exists
+        await using (SqlCommand command = new SqlCommand())
+        {
+            command.Connection = connection;
+            command.CommandText = @"
+                                    SELECT 1 FROM Client WHERE client_id = @ClientId; 
+                                    ";
+            command.Parameters.AddWithValue("@ClientId", data.ClientId);
+
+            var result = command.ExecuteScalarAsync();
+
+            if (result == null)
+            {
+                throw new NotFoundException("Invalid client id");
+            }
+        }
+
+        //Validate if mechanic with such license number exists
+        int NewVisitMechanicId;
+        await using (SqlCommand command = new SqlCommand())
+        {
+            command.Connection = connection;
+            command.CommandText = @"
+                                    SELECT 1 FROM Mechanic WHERE licence_number = @MechanicLicenseNumber
+                                    ";
+            command.Parameters.AddWithValue("@MechanicLicenseNumber", data.MechanicLicenceNumber);
+
+            var reader = await command.ExecuteReaderAsync();
+            
+            
+            
+            if (!await reader.ReadAsync())
+            {
+                throw new NotFoundException("Invalid mechanic's license number");
+            }
+
+            NewVisitMechanicId = reader.GetInt32(0);
+
+        }
+
+        // Validate if provided Services exist
+        foreach (var service in data.Services)
+        {
+            await using (SqlCommand command = new SqlCommand())
+            {
+                command.Connection = connection;
+                command.CommandText = @"
+                                        SELECT 1 FROM Service WHERE name = @ServiceName;
+                                        ";
+                command.Parameters.AddWithValue("@ServiceName", service.ServiceName);
+
+                var result = await command.ExecuteScalarAsync();
+
+                if (result ==
+                    null)
+                {
+                    throw new NotFoundException($"Invalid service name: {service.ServiceName}");
+                }
+            }
+        }
+        await using (SqlCommand command = new SqlCommand())
+        {
+            command.Connection = connection;
+            
+        }
+
+        //Add a new visit table entry
+        await using (SqlCommand command = new SqlCommand())
+        {
+            command.Connection = connection;
+            command.CommandText = @"INSERT INTO Visit (visit_id, client_id, mechanic_id, date)
+                                    VALUES (@VisitId, @ClientId, @MechanicId, GETDATE());
+                                    ";
+            command.Parameters.AddWithValue("@VisitId", data.VisitId);
+            command.Parameters.AddWithValue("@ClientId", data.ClientId);
+            command.Parameters.AddWithValue("@MechanicId", NewVisitMechanicId);
+
+            return "Insertion successful";
+            
+        }
     }
 }
